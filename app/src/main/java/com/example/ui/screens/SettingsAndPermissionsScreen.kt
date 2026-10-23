@@ -81,6 +81,7 @@ import com.example.ui.theme.JarvisTextMuted
 import com.example.ui.theme.JarvisTextPrimary
 import com.example.ui.theme.JarvisTextSecondary
 import com.example.ui.theme.JarvisWarning
+import com.example.ui.components.DeveloperBuildSection
 import com.example.viewmodel.JarvisViewModel
 
 @Composable
@@ -824,6 +825,11 @@ fun SettingsAndPermissionsScreen(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 5. Developer Build & Release Management
+        DeveloperBuildSection()
 
         Spacer(modifier = Modifier.height(24.dp))
     }

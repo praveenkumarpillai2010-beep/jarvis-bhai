@@ -1,0 +1,103 @@
+name: Android APK Build & GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Debug APK & Release Asset
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x gradlew
+
+      - name: Setup Debug Keystore
+        run: |
+          if [ -f "debug.keystore.base64" ]; then
+            echo "Decoding debug.keystore from base64..."
+            base64 -d debug.keystore.base64 > debug.keystore
+          elif [ ! -f "debug.keystore" ]; then
+            echo "Generating default debug keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Setup Environment Files
+        run: |
+          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+            cp .env.example .env
+          fi
+
+      - name: Build Debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Prepare Release Asset
+        run: |
+          mkdir -p release-artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/JARVIS-AI-v1.0.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/app-debug.apk
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JARVIS-AI-v1.0.0-debug-apk
+          path: release-artifacts/JARVIS-AI-v1.0.0.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: JARVIS AI ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release-artifacts/JARVIS-AI-v1.0.0.apk
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## JARVIS AI ${{ github.ref_name }}
+
+            ### Automated Build Asset
+            - **Asset Filename:** `JARVIS-AI-v1.0.0.apk`
+            - **Expected Local Path:** `app/build/outputs/apk/debug/app-debug.apk`
+            - **Target SDK:** 36 | **Min SDK:** 24
+
+            ### Included Features
+            - Silent microphone startup and continuous voice interaction.
+            - Gemini AI brain with settings console & connection testing.
+            - WhatsApp voice-guided multi-turn messaging workflow.
+            - Device controls (Flashlight, Battery, Apps, Alarms, Timers).
+            - Lock-screen wake and screen turn-on support.
+            - Natural female voice profile with customizable pitch/rate.
+            - Firestore backend security rules.
+
+            > **Security Notice:** This is a Debug APK signed with the Android debug key for testing and sideloading. For Google Play production distribution, sign with a secure upload keystore.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
